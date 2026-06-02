@@ -1,0 +1,22 @@
+# Core CV + numerics
+mediapipe>=0.10.9
+opencv-python>=4.8.0
+numpy>=1.24,<2.0
+scipy>=1.10
+
+# ML
+scikit-learn>=1.3
+fastdtw>=0.3.4
+
+# App + viz
+streamlit>=1.30
+matplotlib>=3.7
+plotly>=5.18
+pandas>=2.0
+
+# Feedback (optional at runtime; offline fallback exists)
+anthropic>=0.40
+python-dotenv>=1.0
+
+# Dev
+pytest>=7.4

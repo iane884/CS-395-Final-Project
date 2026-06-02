@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Env / secrets
+.env
+
+# Data: keep folder structure, ignore large/binary media (copyright + size)
+data/raw/*
+data/reference/*
+data/golfdb/*
+!data/**/.gitkeep
+!data/reference/*.json
+!data/reference/*.npz
+
+# Artifacts: keep small model/template files, ignore the rest by default
+artifacts/*
+!artifacts/.gitkeep
+
+# OS
+.DS_Store
