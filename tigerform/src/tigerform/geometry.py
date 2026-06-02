@@ -6,6 +6,8 @@ so a few bad frames don't crash the pipeline.
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 
@@ -75,9 +77,12 @@ def moving_average(series: np.ndarray, window: int) -> np.ndarray:
         return arr
     out = np.empty_like(arr)
     half = window // 2
-    for i in range(arr.shape[0]):
-        lo, hi = max(0, i - half), min(arr.shape[0], i + half + 1)
-        chunk = arr[lo:hi]
-        with np.errstate(invalid="ignore"):
-            out[i] = np.nanmean(chunk, axis=0)
+    with warnings.catch_warnings():
+        # All-NaN windows (frames with no detection) are expected; the result
+        # stays NaN and is treated as a gap downstream.
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        for i in range(arr.shape[0]):
+            lo, hi = max(0, i - half), min(arr.shape[0], i + half + 1)
+            with np.errstate(invalid="ignore"):
+                out[i] = np.nanmean(arr[lo:hi], axis=0)
     return out

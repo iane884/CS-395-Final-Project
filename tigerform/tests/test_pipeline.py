@@ -23,9 +23,12 @@ def test_run_on_sequence_report(reference, discriminator):
     assert result.overlay_path and result.overlay_path.endswith(".mp4")
 
 
-def test_pipeline_without_discriminator(reference):
-    seq = synthetic_pose(AMATEUR, seed=4)
-    result = run_on_sequence(seq, video=None, use_claude=False, render=False,
-                             reference=reference, discriminator=None)
-    assert result.comparison.tiger_likeness is None
-    assert 0 <= result.comparison.similarity_score <= 100
+def test_compare_without_discriminator(reference, amateur_features):
+    # compare_swing must work (and report no Tiger-likeness) when no
+    # discriminator is supplied. Tested directly so it doesn't depend on whether
+    # a trained artifact happens to exist on disk (run_on_sequence auto-loads one
+    # if present — that's intended app/CLI behavior).
+    from tigerform.compare import compare_swing
+    result = compare_swing(amateur_features, reference, discriminator=None)
+    assert result.tiger_likeness is None
+    assert 0 <= result.similarity_score <= 100
