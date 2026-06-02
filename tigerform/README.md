@@ -43,8 +43,15 @@ reference, and generates prioritized coaching feedback.
 
 ```bash
 cd tigerform
-python3.11 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+py -3.12 -m venv .venv
+# bash / Git Bash:
+source .venv/Scripts/activate
+# PowerShell:
+# .\.venv\Scripts\Activate.ps1
+# or cmd.exe:
+# .\.venv\Scripts\activate.bat
+python -m pip install -U pip
+python -m pip install -r requirements.txt
 
 # Build the Tiger reference + discriminator (uses synthetic swings if you have
 # no real clips — works out of the box):
@@ -60,6 +67,9 @@ python -m tigerform.pipeline data/raw/your_swing.mp4
 # Launch the web app:
 streamlit run app/streamlit_app.py
 ```
+
+Use Python 3.11 or 3.12 for this project. Python 3.13 is not supported by the
+current NumPy/SciPy stack pinned here.
 
 Optional: copy `.env.example` to `.env` and set `ANTHROPIC_API_KEY` to get
 Claude-phrased coaching (otherwise a deterministic template is used).

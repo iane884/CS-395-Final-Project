@@ -7,7 +7,7 @@ name = "tigerform"
 version = "0.1.0"
 description = "AI golf-swing monitor comparing player mechanics to Tiger Woods' swing"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9,<3.13"
 
 [tool.setuptools.packages.find]
 where = ["src"]
