@@ -14,19 +14,18 @@ reference, and generates prioritized coaching feedback.
 ## What it does
 
 1. **Pose estimation** - MediaPipe BlazePose extracts 33 body landmarks per frame.
+   (MediaPipe sees only the body — it does **not** detect the club or ball.)
 2. **Swing segmentation** - locates the 8 standard swing events (address → top →
    impact → finish) from the lead-hand height profile.
-3. **Club approximation** - estimates the shaft from the arms/hands (MediaPipe
-   doesn't see the club; ball tracking is intentionally out of scope).
-4. **Biomechanical features** - view-robust joint angles + tempo + X-factor +
+3. **Biomechanical features** - view-robust joint angles + tempo + X-factor +
    head stability, normalized so golfers of different size are comparable.
-5. **Comparison** - z-score deviations vs. a **Tiger reference template**, a
-   0–100 **similarity score**, DTW sequence matching, and a **Tiger-vs-amateur
+4. **Comparison** - z-score deviations vs. a **Tiger reference template**, two
+   0-100 scores (**Position match** and **Tempo match**), and a **Tiger-vs-amateur
    discriminator** whose feature importances explain *which* mechanics differ.
-6. **Feedback** - a rule table maps deviations to drills; the Claude API phrases
+5. **Feedback** - a rule table maps deviations to drills; the Claude API phrases
    them into natural coaching (deterministic template fallback when offline).
-7. **App** - a Streamlit UI for uploading a swing and viewing the annotated
-   overlay, score, charts, and coaching.
+6. **App** - a Streamlit UI for uploading a swing and viewing the annotated
+   overlay, scores, deviation chart, scorecard, and coaching.
 
 ### Design choices (vs. the original proposal)
 
@@ -35,7 +34,9 @@ reference, and generates prioritized coaching feedback.
 - **Similarity + discriminator** instead of a literal "good/bad" classifier
   (labeled "flawed Tiger swings" don't exist). The discriminator measures match
   to Tiger's *signature mechanics*, not an objective quality verdict.
-- **Body + approximate club**; ball-flight tracking dropped as a stretch goal.
+- **Body pose only** — MediaPipe sees the body, not the club, so club and ball
+  tracking are out of scope. (We tried approximating the club shaft from the
+  hands; it was unreliable at the top of the swing and was removed.)
 
 ---
 
@@ -96,17 +97,17 @@ src/tigerform/
   geometry.py    angle / rotation / smoothing helpers
   ingest.py      video -> frames + metadata + framing warnings
   pose.py        MediaPipe -> smoothed landmark time series (PoseSequence)
-  club.py        approximate club shaft from arms/hands
   events.py      heuristic swing-event segmentation
   normalize.py   torso-length normalization for positional features
-  features.py    biomechanical feature vector + DTW time series
+  features.py    biomechanical feature vector (+ time series for charts)
   synthetic.py   parametric swing generator (Tiger/amateur) for demo + tests
-  analyze.py     pose -> club + events + features (light orchestration)
-  reference.py   Tiger reference template (mean/std + curves), save/load
+  analyze.py     pose -> events + features (light orchestration)
+  reference.py   Tiger reference template (mean/std), save/load
   model.py       Tiger-vs-amateur discriminator (sklearn), importances
-  compare.py     z-scores, similarity score, DTW, ranked deviations
+  compare.py     z-scores, Position/Tempo match scores, ranked deviations
   feedback.py    coaching rules + Claude phrasing + offline fallback
-  viz.py         annotated overlay video + comparison charts
+  scorecard.py   plain-language per-position scorecard
+  viz.py         annotated overlay video + deviation bar chart
   pipeline.py    end-to-end orchestration + CLI
 scripts/         build_reference, train_discriminator, evaluate, demo, download_golfdb
 app/             streamlit_app.py
@@ -139,7 +140,9 @@ training data.
 
 - Single-camera 2D→3D is approximate; use consistent front-on / down-the-line
   framing and good lighting.
-- The club shaft is approximated from the hands, not detected; no ball tracking.
+- **The club and ball are not tracked.** MediaPipe detects only body joints, so
+  the analysis covers body mechanics only. (An early hand-based club estimate was
+  unreliable at the top of the swing and was removed.)
 - The bundled reference/discriminator are trained on a **synthetic** swing model
   for demonstration. Swap in real Tiger + amateur clips for meaningful real-world
   scores - the code path is identical.
