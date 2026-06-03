@@ -57,19 +57,50 @@ def render_overlay(video, seq: PoseSequence, club: ClubTrack,
                    events: SwingEvents, out_path: str | Path) -> Path:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    h, w = video.frames[0].shape[:2]
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(str(out_path), fourcc, video.fps, (w, h))
 
     frame_to_event = {f: e for e, f in events.frames.items()}
+    rgb_frames = []
+    for t, frame in enumerate(video.frames):
+        label = frame_to_event.get(t, "")
+        label = label.replace("_", " ").title() if label else ""
+        bgr = draw_frame(frame, seq, t, club, label)
+        rgb_frames.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+
+    _write_video(out_path, rgb_frames, video.fps)
+    return out_path
+
+
+def _write_video(out_path: Path, rgb_frames, fps: float) -> None:
+    """Write an H.264 MP4 (yuv420p) so it plays in browsers / st.video.
+
+    OpenCV's default 'mp4v' codec produces MPEG-4 Part 2, which HTML5 <video>
+    can't decode. We prefer imageio's bundled ffmpeg (libx264); if that's
+    unavailable we fall back to OpenCV mp4v (file still written, may not preview
+    in-browser).
+    """
+    fps = max(1.0, float(fps or 30.0))
     try:
-        for t, frame in enumerate(video.frames):
-            label = frame_to_event.get(t, "")
-            label = label.replace("_", " ").title() if label else ""
-            writer.write(draw_frame(frame, seq, t, club, label))
+        import imageio
+        writer = imageio.get_writer(
+            str(out_path), fps=fps, codec="libx264", quality=8,
+            pixelformat="yuv420p", macro_block_size=16, format="FFMPEG")
+        try:
+            for f in rgb_frames:
+                writer.append_data(f)
+        finally:
+            writer.close()
+        return
+    except Exception:
+        pass  # fall back to OpenCV below
+
+    h, w = rgb_frames[0].shape[:2]
+    writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"),
+                             fps, (w, h))
+    try:
+        for f in rgb_frames:
+            writer.write(cv2.cvtColor(f, cv2.COLOR_RGB2BGR))
     finally:
         writer.release()
-    return out_path
 
 
 # --------------------------------------------------------------------------- #

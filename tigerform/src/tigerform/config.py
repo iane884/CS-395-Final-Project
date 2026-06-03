@@ -29,6 +29,14 @@ DISCRIMINATOR_PATH = ARTIFACTS_DIR / "discriminator.joblib"
 for _d in (RAW_DIR, REFERENCE_DIR, GOLFDB_DIR, ARTIFACTS_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
+# Load <root>/.env (e.g. ANTHROPIC_API_KEY) so the key set there is available
+# to os.environ everywhere. Existing environment variables take precedence.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ROOT / ".env")
+except Exception:
+    pass
+
 # --------------------------------------------------------------------------- #
 # Swing events (GolfDB ordering)
 # --------------------------------------------------------------------------- #

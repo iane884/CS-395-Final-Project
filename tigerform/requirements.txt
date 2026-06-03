@@ -13,6 +13,8 @@ streamlit>=1.30
 matplotlib>=3.7
 plotly>=5.18
 pandas>=2.0
+imageio>=2.31              # H.264 overlay encoding (browser-playable)
+imageio-ffmpeg>=0.4        # bundled ffmpeg binary for libx264
 
 # Feedback (optional at runtime; offline fallback exists)
 anthropic>=0.40
