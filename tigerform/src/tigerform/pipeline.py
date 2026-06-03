@@ -1,6 +1,6 @@
 """End-to-end TigerForm pipeline for a single swing.
 
-ingest -> pose -> (club, events, features) -> compare -> feedback -> viz.
+ingest -> pose -> (events, features) -> compare -> feedback -> viz.
 
 Usable two ways:
 * `run_pipeline(video_path)` for a real video file, and
@@ -40,9 +40,9 @@ class PipelineResult:
     def report(self) -> dict:
         c = self.comparison
         return {
-            "similarity_score": c.similarity_score,
-            "sequence_similarity": c.sequence_similarity,
-            "tiger_likeness": c.tiger_likeness,
+            "position_match": c.position_match,
+            "tempo_match": c.tempo_match,
+            "tiger_likeness": c.tiger_likeness,   # diagnostic only
             "events": self.events.frames,
             "event_confidence": self.events.confidence,
             "features": self.features.scalars,
@@ -92,8 +92,7 @@ def run_on_sequence(seq: PoseSequence, video=None, use_claude: bool = True,
         from .viz import render_overlay
         out_dir = Path(out_dir or config.ARTIFACTS_DIR)
         overlay_path = str(render_overlay(
-            video, seq, analyzed.club, analyzed.events,
-            out_dir / "overlay.mp4"))
+            video, seq, analyzed.events, out_dir / "overlay.mp4"))
 
     return PipelineResult(events=analyzed.events, features=analyzed.features,
                           comparison=comparison, feedback=feedback,
@@ -105,11 +104,12 @@ def run_pipeline(video_path: str | Path, handedness: str = "right",
                  use_claude: bool = True, render: bool = True,
                  out_dir: Optional[Path] = None,
                  reference: Optional[ReferenceTemplate] = None,
-                 discriminator: Optional[TigerDiscriminator] = None) -> PipelineResult:
+                 discriminator: Optional[TigerDiscriminator] = None,
+                 rotate: "str | int" = "auto") -> PipelineResult:
     from .ingest import load_video
     from .pose import estimate_pose
 
-    video = load_video(video_path)
+    video = load_video(video_path, rotate=rotate)
     seq = estimate_pose(video, handedness=handedness)
     return run_on_sequence(seq, video=video, use_claude=use_claude, render=render,
                            out_dir=out_dir, reference=reference,
@@ -120,21 +120,25 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Analyze a golf swing vs. Tiger Woods.")
     ap.add_argument("video", help="Path to a swing video (front-on or down-the-line).")
     ap.add_argument("--handedness", choices=["right", "left"], default="right")
+    ap.add_argument("--rotate", default="auto",
+                    help="Orientation: 'auto' (metadata) or 0/90/180/270 (CW).")
     ap.add_argument("--no-claude", action="store_true", help="Skip Claude phrasing.")
     ap.add_argument("--no-render", action="store_true", help="Skip overlay video.")
     ap.add_argument("--out-dir", default=str(config.ARTIFACTS_DIR))
     args = ap.parse_args(argv)
 
+    rotate = args.rotate if args.rotate == "auto" else int(args.rotate)
     out_dir = Path(args.out_dir)
-    result = run_pipeline(args.video, handedness=args.handedness,
+    result = run_pipeline(args.video, handedness=args.handedness, rotate=rotate,
                           use_claude=not args.no_claude, render=not args.no_render,
                           out_dir=out_dir)
     report_path = result.save_report(out_dir / "report.json")
 
+    c = result.comparison
     print(f"\n=== TigerForm ===")
     print(result.feedback.headline)
-    if result.comparison.tiger_likeness is not None:
-        print(f"Tiger-likeness (discriminator): {result.comparison.tiger_likeness:.2f}")
+    print(f"Position match: {c.position_match:.0f}/100   "
+          f"Tempo match: {c.tempo_match:.0f}/100")
     print(f"\n{result.feedback.coaching_text}\n")
     if result.overlay_path:
         print(f"Overlay video: {result.overlay_path}")

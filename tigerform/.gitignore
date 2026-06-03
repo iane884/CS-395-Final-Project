@@ -12,6 +12,7 @@ venv/
 # Data: keep folder structure, ignore large/binary media (copyright + size)
 data/raw/*
 data/reference/*
+data/amateur/*
 data/golfdb/*
 !data/**/.gitkeep
 !data/reference/*.json

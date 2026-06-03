@@ -38,9 +38,8 @@ def main():
 
     print(f"\n=== TigerForm demo ({args.kind}-like synthetic swing) ===")
     print(result.feedback.headline)
-    if result.comparison.tiger_likeness is not None:
-        print(f"Tiger-likeness: {result.comparison.tiger_likeness:.2f}")
-    print(f"Sequence similarity: {result.comparison.sequence_similarity}")
+    print(f"Position match: {result.comparison.position_match}  "
+          f"Tempo match: {result.comparison.tempo_match}")
     print(f"\n{result.feedback.coaching_text}\n")
     print(f"Overlay: {result.overlay_path}")
     print(f"Report:  {report_path}")

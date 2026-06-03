@@ -6,13 +6,10 @@ scipy>=1.10
 
 # ML
 scikit-learn>=1.3
-fastdtw>=0.3.4
 
 # App + viz
 streamlit>=1.30
-matplotlib>=3.7
-plotly>=5.18
-pandas>=2.0
+matplotlib>=3.7            # radar comparison chart
 imageio>=2.31              # H.264 overlay encoding (browser-playable)
 imageio-ffmpeg>=0.4        # bundled ffmpeg binary for libx264
 

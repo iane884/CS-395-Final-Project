@@ -52,7 +52,7 @@ def main():
     # --- score separation ---
     tiger_scores, am_scores = [], []
     for a, lab, _, _ in analyzed:
-        s = compare_swing(a.features, ref, disc).similarity_score
+        s = compare_swing(a.features, ref, disc).position_match
         (tiger_scores if lab == 1 else am_scores).append(s)
     print("\n=== Similarity-score separation ===")
     print(f"Tiger-like mean score:   {np.mean(tiger_scores):.1f}")

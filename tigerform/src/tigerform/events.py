@@ -3,8 +3,7 @@
 MVP heuristic: the lead hand traces a low -> high (top) -> low (impact) ->
 high (finish) height profile through the swing. We locate the two height peaks
 (top, finish) and the troughs (address, impact) from the lead-wrist vertical
-trajectory, then interpolate the four intermediate GolfDB events. Optionally
-refine ``toe_up`` using the club shaft passing through horizontal.
+trajectory, then interpolate the four intermediate GolfDB events.
 
 This is intentionally simple and robust; the plan's optional upgrade is a
 learned SwingNet model trained on GolfDB, which would replace `segment_swing`
@@ -13,12 +12,11 @@ while keeping the same `SwingEvents` output contract.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
 
 from . import config
-from .club import ClubTrack
 from .pose import PoseSequence
 
 
@@ -45,7 +43,7 @@ def _interp_nan(y: np.ndarray) -> np.ndarray:
     return y
 
 
-def segment_swing(seq: PoseSequence, club: Optional[ClubTrack] = None) -> SwingEvents:
+def segment_swing(seq: PoseSequence) -> SwingEvents:
     n = seq.n_frames
     lt = config.lead_trail_indices(seq.handedness)
     # Height of the lead hand: image y grows downward, so height = -y.
@@ -81,12 +79,6 @@ def segment_swing(seq: PoseSequence, club: Optional[ClubTrack] = None) -> SwingE
     frames["mid_downswing"] = _between(top, frames["impact"], 0.6)
     frames["mid_follow_through"] = _between(frames["impact"], finish, 0.5)
 
-    # Refine toe_up: first frame in the backswing where the shaft is ~horizontal.
-    if club is not None:
-        tu = _first_horizontal(club.shaft_angle, address, top)
-        if tu is not None:
-            frames["toe_up"] = tu
-
     frames = {k: int(np.clip(v, 0, n - 1)) for k, v in frames.items()}
     conf = _confidence(height, frames, rng)
     return SwingEvents(frames=frames, confidence=conf)
@@ -94,15 +86,6 @@ def segment_swing(seq: PoseSequence, club: Optional[ClubTrack] = None) -> SwingE
 
 def _between(a: int, b: int, frac: float) -> int:
     return int(round(a + (b - a) * frac))
-
-
-def _first_horizontal(shaft_angle: np.ndarray, lo: int, hi: int,
-                      tol: float = 12.0) -> Optional[int]:
-    for t in range(lo, max(lo + 1, hi)):
-        ang = shaft_angle[t]
-        if np.isfinite(ang) and ang <= tol:
-            return t
-    return None
 
 
 def _confidence(height: np.ndarray, frames: Dict[str, int], rng: float) -> float:

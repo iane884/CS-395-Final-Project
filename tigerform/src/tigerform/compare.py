@@ -1,11 +1,15 @@
 """Compare a user swing against the Tiger reference.
 
-Produces:
-* per-feature z-score deviations (how many std from Tiger's mean),
-* a 0-100 similarity score (discriminator-importance-weighted, optionally
-  blended with the discriminator's Tiger-likeness probability),
-* a DTW-based sequence similarity on normalized swing time-series,
-* a ranked list of the biggest deviations to drive coaching feedback.
+Produces two orthogonal 0-100 scores plus a ranked breakdown:
+
+* **Position match** — how close the *static* body angles/posture are to Tiger's
+  at the key events (address/top/impact). Excludes timing.
+* **Tempo match** — how close the *rhythm* (backswing:downswing ratio) is to
+  Tiger's. Independent of positions.
+* **Deviations** — the biggest per-feature differences, ranked by the trained
+  discriminator's feature importances (the one thing only the supervised model
+  does). The discriminator's raw probability is kept as a diagnostic, not a
+  headline number, since it duplicates "position match" for users.
 """
 from __future__ import annotations
 
@@ -39,39 +43,23 @@ class Deviation:
 
 @dataclass
 class ComparisonResult:
-    similarity_score: float          # 0-100 overall match to Tiger
-    sequence_similarity: float       # 0-100 from DTW on swing curves
-    tiger_likeness: Optional[float]  # discriminator probability (0-1) or None
+    position_match: float            # 0-100 static angles/posture vs Tiger
+    tempo_match: float               # 0-100 rhythm (back:down ratio) vs Tiger
+    tiger_likeness: Optional[float]  # discriminator probability (0-1); diagnostic only
     zscores: Dict[str, float]
     deviations: List[Deviation]      # sorted, most severe first
-    dtw: Dict[str, float]
     weights: Dict[str, float]
 
 
 def _zscore_similarity(zscores: Dict[str, float], weights: Dict[str, float]) -> float:
+    """Map a group of z-scores to 0-100 (100 = on Tiger's mean). Per-feature |z|
+    is capped so one very-different feature can't dominate."""
     if not zscores:
-        return 0.0
-    num = sum(weights.get(k, 0.0) * abs(z) for k, z in zscores.items())
-    den = sum(weights.get(k, 0.0) for k in zscores) or 1.0
-    weighted_abs_z = num / den
-    return float(100.0 * np.exp(-0.5 * weighted_abs_z))
-
-
-def _dtw_distance(a: np.ndarray, b: np.ndarray) -> float:
-    """Shape-focused DTW distance between two series (z-normalized first)."""
-    from fastdtw import fastdtw
-
-    def zn(s):
-        s = np.asarray(s, float)
-        s = s[np.isfinite(s)]
-        sd = s.std()
-        return (s - s.mean()) / sd if sd > 1e-6 else s - s.mean()
-
-    za, zb = zn(a), zn(b)
-    if len(za) < 2 or len(zb) < 2:
         return float("nan")
-    dist, _ = fastdtw(za, zb, dist=lambda x, y: abs(x - y))
-    return float(dist / max(len(za), len(zb)))   # length-normalized
+    cap = config.ZSCORE_SIM_CAP
+    num = sum(weights.get(k, 0.0) * min(abs(z), cap) for k, z in zscores.items())
+    den = sum(weights.get(k, 0.0) for k in zscores) or 1.0
+    return float(100.0 * np.exp(-0.5 * num / den))
 
 
 def compare_swing(features: SwingFeatures, reference: ReferenceTemplate,
@@ -79,29 +67,29 @@ def compare_swing(features: SwingFeatures, reference: ReferenceTemplate,
                   ) -> ComparisonResult:
     zscores = reference.zscores(features)
 
-    # Feature weights: discriminator importance if available, else uniform.
+    # Feature weights: discriminator importance if available, else uniform...
     if discriminator is not None:
         weights = discriminator.feature_importance()
     else:
         weights = {k: 1.0 / max(len(zscores), 1) for k in zscores}
+    # ...scaled by each feature's single-camera reliability so noisy / unreliable
+    # features (head sway, depth-axis spine tilt, clip-dependent swing time) don't
+    # dominate.
+    weights = {k: weights.get(k, 0.0) *
+               config.FEATURE_RELIABILITY.get(config.base_of(k), config.DEFAULT_RELIABILITY)
+               for k in set(weights) | set(zscores)}
 
-    score_sim = _zscore_similarity(zscores, weights)
+    # Split into orthogonal axes: timing (tempo) vs everything else (positions).
+    tempo_z = {k: v for k, v in zscores.items() if config.base_of(k) in config.TEMPO_FEATURES}
+    position_z = {k: v for k, v in zscores.items() if config.base_of(k) not in config.TEMPO_FEATURES}
 
-    tiger_likeness = None
-    final = score_sim
-    if discriminator is not None:
-        tiger_likeness = discriminator.tiger_likeness(features)
-        final = 0.6 * score_sim + 0.4 * (100.0 * tiger_likeness)
+    position_match = _zscore_similarity(position_z, weights)
+    tempo_match = _zscore_similarity(tempo_z, weights)
 
-    # DTW on shared time series.
-    dtw: Dict[str, float] = {}
-    for name, ref_curve in reference.series.items():
-        if name in features.series:
-            dtw[name] = _dtw_distance(features.series[name], np.array(ref_curve))
-    valid = [d for d in dtw.values() if np.isfinite(d)]
-    seq_sim = float(100.0 * np.exp(-0.4 * np.mean(valid))) if valid else float("nan")
+    # Discriminator probability is kept only as a diagnostic (not a headline).
+    tiger_likeness = discriminator.tiger_likeness(features) if discriminator else None
 
-    # Rank deviations.
+    # Rank deviations across all features by importance-weighted magnitude.
     deviations: List[Deviation] = []
     for k, z in zscores.items():
         if abs(z) < config.ZSCORE_FLAG_THRESHOLD:
@@ -117,8 +105,8 @@ def compare_swing(features: SwingFeatures, reference: ReferenceTemplate,
     deviations.sort(key=lambda d: d.severity, reverse=True)
 
     return ComparisonResult(
-        similarity_score=round(final, 1),
-        sequence_similarity=round(seq_sim, 1) if np.isfinite(seq_sim) else float("nan"),
+        position_match=round(position_match, 1) if np.isfinite(position_match) else float("nan"),
+        tempo_match=round(tempo_match, 1) if np.isfinite(tempo_match) else float("nan"),
         tiger_likeness=round(tiger_likeness, 3) if tiger_likeness is not None else None,
-        zscores=zscores, deviations=deviations, dtw=dtw, weights=weights,
+        zscores=zscores, deviations=deviations, weights=weights,
     )

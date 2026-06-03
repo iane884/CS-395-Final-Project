@@ -25,72 +25,67 @@ RULES: Dict[str, Dict[str, str]] = {
     "shoulder_turn": {
         "low": "You're under-rotating your shoulders. A fuller turn stores more power, like Tiger's deep backswing.",
         "high": "You're over-rotating your shoulders, which can get the club across the line. Feel a slightly shorter, more controlled turn.",
-        "drill": "Backswing turn drill: place a club across your shoulders and rotate until it points behind the ball.",
+        "drill": "Shoulder-turn drill: lay a club across your chest and turn back until the grip end points behind the ball — that's a full, Tiger-like shoulder turn.",
     },
     "hip_turn": {
         "low": "Your hips are too quiet in the backswing. Allow a little more hip turn to load the trail side.",
         "high": "Your hips are spinning too early/much, which leaks the X-factor. Keep the lower body more stable going back.",
-        "drill": "Trail-foot-back drill to feel resisted hip rotation while the shoulders turn fully.",
+        "drill": "Trail-foot-back drill: pull your trail foot a few inches off the line at setup, which restricts the hips so you feel them resist while your shoulders turn fully.",
     },
     "x_factor": {
         "low": "Your shoulder-hip separation (X-factor) at the top is smaller than Tiger's. More separation = more stored power.",
         "high": "Your X-factor is very large; great for power but make sure you can sequence it without losing balance.",
-        "drill": "Pause-at-the-top drill: feel your back to the target while your belt buckle stays quieter.",
+        "drill": "Pause-at-the-top drill: swing to the top and freeze — feel your back to the target (shoulders fully turned) while your belt buckle stays quieter (hips less turned).",
     },
     "lead_elbow_angle": {
         "low": "Your lead arm is more bent at the top than Tiger's. A straighter (not rigid) lead arm widens your arc.",
         "high": "Your lead arm is locked very straight; keep some softness to avoid tension.",
-        "drill": "Towel-under-lead-arm drill to keep the arm extended without over-tightening.",
+        "drill": "Towel drill: tuck a towel under your lead armpit and keep it pinned into the backswing — it trains a connected, extended (not rigid) lead arm.",
     },
     "lead_knee_flex": {
         "low": "Your lead knee is fairly straight; add a little flex for a more athletic, stable base.",
         "high": "Lots of lead-knee flex; make sure you're not sinking or losing posture.",
-        "drill": "Chair-tap setup drill to groove consistent knee flex at address.",
+        "drill": "Chair drill: set up with your backside just touching the edge of a chair and keep light contact during the backswing, so you hold your knee flex and posture.",
     },
     "trail_knee_flex": {
         "low": "Your trail knee straightens in the backswing; keep it flexed to stay loaded.",
         "high": "Trail knee is very bent; keep stability so you don't sway off the ball.",
-        "drill": "Maintain trail-knee flex against an alignment stick through the backswing.",
+        "drill": "Alignment-stick drill: stand a stick just outside your trail knee and keep light pressure on it going back, so the knee stays flexed instead of straightening.",
     },
     "spine_tilt_forward": {
         "low": "You're standing a bit tall; add forward spine tilt from the hips for a better swing plane.",
         "high": "You're bent over more than Tiger; ease the forward tilt to free up rotation.",
-        "drill": "Posture drill: hinge from the hips with a club along your spine.",
+        "drill": "Posture drill: hold a club vertically against your spine (touching head, mid-back, tailbone), then tilt forward from your hip joints — not by rounding your back.",
     },
     "spine_tilt_lateral": {
         "low": "Add a touch of secondary (away-from-target) tilt at impact to help shallow the club.",
         "high": "Too much lateral tilt can cause early extension; keep the tilt moderate.",
-        "drill": "Impact-bag drill focusing on a stable, slightly tilted spine.",
-    },
-    "club_shaft_angle": {
-        "low": "Your shaft is shallower than the reference at this point; check your swing plane.",
-        "high": "Your shaft is steeper than the reference; feel it trace a flatter plane.",
-        "drill": "Plane-board / alignment-stick drill to match the reference shaft angle.",
+        "drill": "Impact-bag drill: push a padded bag (or stack of towels) at impact while keeping your spine tilted slightly away from the target and stable.",
     },
     "tempo_ratio": {
         "low": "Your transition is quick (downswing too fast relative to backswing). Tiger's tempo is near 3:1.",
         "high": "Your backswing is slow relative to the downswing; smooth it toward a 3:1 feel.",
-        "drill": "Count '1-2-3' back, '1' down to ingrain a 3:1 tempo.",
+        "drill": "Counting drill: count '1-2-3' on the way back and a quick '1' coming down — this grooves the roughly 3:1 backswing-to-downswing rhythm.",
     },
     "total_swing_time": {
         "low": "Your overall swing is quick; make sure you complete the backswing.",
         "high": "Your swing is slow overall; a touch more pace can improve sequencing.",
-        "drill": "Metronome practice swings to standardize total swing time.",
+        "drill": "Metronome drill: set a metronome and match your backswing and downswing to its beats so your overall timing repeats.",
     },
     "head_sway": {
         "low": "Nice steady head laterally.",
         "high": "Your head sways off the ball. Keep it centered like Tiger for a consistent low point.",
-        "drill": "Wall/head-against-glove drill to limit lateral head movement.",
+        "drill": "Wall drill: rest your head lightly against a wall (or a partner's hand) and make slow swings without losing contact, so your head stops sliding off the ball.",
     },
     "head_bob": {
         "low": "Good vertical head stability.",
         "high": "Your head moves up/down during the swing; maintain your spine height for solid contact.",
-        "drill": "Keep your head level against a fixed background reference during practice swings.",
+        "drill": "Background drill: pick a fixed spot behind the ball and keep your head level with it through practice swings, so you don't rise up or dip down.",
     },
     "com_lateral_shift": {
         "low": "Limited weight shift; allow some pressure move to the lead side through impact.",
         "high": "You're sliding laterally rather than rotating; turn into the lead side instead of sway.",
-        "drill": "Step-through drill to feel rotation over slide.",
+        "drill": "Step-through drill: after impact, let your trail foot step toward the target — this trains rotating through the ball instead of sliding sideways.",
     },
 }
 
@@ -161,12 +156,12 @@ def generate_feedback(result: ComparisonResult, use_claude: bool = True,
 
 
 def _headline(result: ComparisonResult) -> str:
-    s = result.similarity_score
+    s = result.position_match
     band = ("a strong match to" if s >= 80 else
             "a solid foundation compared to" if s >= 60 else
             "some clear differences from" if s >= 40 else
             "significant differences from")
-    return f"Your swing scored {s:.0f}/100 — {band} Tiger's mechanics."
+    return f"Your positions scored {s:.0f}/100 — {band} Tiger's mechanics."
 
 
 def _template_coaching(result: ComparisonResult, tips: List[Tip], headline: str) -> str:
@@ -192,18 +187,20 @@ def _claude_coaching(result: ComparisonResult, tips: List[Tip],
     system = [
         {"type": "text",
          "text": "You are TigerForm, an encouraging, concise golf swing coach. "
-                 "You are given a golfer's similarity score to Tiger Woods' swing "
-                 "and a ranked list of biomechanical deviations with drills. Write "
-                 "a short, motivating coaching note (120-180 words): open with the "
-                 "score context, then give the 2-4 prioritized fixes in plain "
+                 "You are given how a golfer's positions and tempo compare to Tiger "
+                 "Woods' and a ranked list of biomechanical deviations with drills. "
+                 "Write a short, motivating coaching note (120-180 words): open with "
+                 "the score context, then give the 2-4 prioritized fixes in plain "
                  "language a golfer understands, weaving in the suggested drills. "
+                 "Whenever you mention a drill, briefly explain how to do it in the "
+                 "same sentence — assume the golfer has never heard of it. "
                  "Be specific and positive; never invent numbers beyond those given.",
          "cache_control": {"type": "ephemeral"}},
     ]
     payload = {
         "headline": headline,
-        "similarity_score": result.similarity_score,
-        "tiger_likeness": result.tiger_likeness,
+        "position_match": result.position_match,
+        "tempo_match": result.tempo_match,
         "tips": [asdict(t) for t in tips],
     }
     try:

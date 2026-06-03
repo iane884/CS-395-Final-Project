@@ -45,9 +45,41 @@ def _resize_keep_aspect(frame: np.ndarray, target_w: int) -> np.ndarray:
                       interpolation=cv2.INTER_AREA)
 
 
+def _metadata_rotation(cap) -> int:
+    """Rotation (deg, one of 0/90/180/270) recorded in the video metadata.
+
+    Phone clips are often stored landscape with a rotation flag; OpenCV does not
+    auto-apply it, so we read it and rotate the frames ourselves.
+    """
+    prop = getattr(cv2, "CAP_PROP_ORIENTATION_META", None)
+    if prop is None:
+        return 0
+    try:
+        rot = cap.get(prop)
+    except Exception:
+        return 0
+    if rot is None or rot != rot:  # None or NaN
+        return 0
+    return int(round(rot)) % 360
+
+
+def _rotate_frame(frame: np.ndarray, deg: int) -> np.ndarray:
+    if deg == 90:
+        return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    if deg == 180:
+        return cv2.rotate(frame, cv2.ROTATE_180)
+    if deg == 270:
+        return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return frame
+
+
 def load_video(path: str | Path, resize_width: int = config.RESIZE_WIDTH,
-               max_frames: int = 900) -> VideoData:
+               max_frames: int = 900, rotate: "str | int" = "auto") -> VideoData:
     """Decode a video file into a `VideoData` bundle.
+
+    `rotate` controls orientation: "auto" applies the rotation recorded in the
+    clip's metadata (fixes sideways phone videos); 0/90/180/270 forces a manual
+    clockwise rotation for clips whose metadata is missing or wrong.
 
     `max_frames` guards against accidentally loading a very long clip (default
     ~30 s at 30 fps). Raises FileNotFoundError / ValueError on bad input.
@@ -61,14 +93,17 @@ def load_video(path: str | Path, resize_width: int = config.RESIZE_WIDTH,
         raise ValueError(f"Could not open video (unsupported codec?): {path}")
 
     fps = cap.get(cv2.CAP_PROP_FPS) or config.TARGET_FPS
-    orig_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    orig_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    deg = _metadata_rotation(cap) if rotate == "auto" else int(rotate) % 360
 
     frames: List[np.ndarray] = []
+    raw_dims = None
     while len(frames) < max_frames:
         ok, frame = cap.read()
         if not ok:
             break
+        frame = _rotate_frame(frame, deg)
+        if raw_dims is None:
+            raw_dims = (frame.shape[1], frame.shape[0])  # w, h before resize
         frames.append(_resize_keep_aspect(frame, resize_width))
     cap.release()
 
@@ -76,6 +111,7 @@ def load_video(path: str | Path, resize_width: int = config.RESIZE_WIDTH,
         raise ValueError(f"No frames decoded from: {path}")
 
     h, w = frames[0].shape[:2]
+    orig_w, orig_h = raw_dims
     vid = VideoData(path=path, frames=frames, fps=float(fps), width=w, height=h,
                     orig_width=orig_w, orig_height=orig_h)
     vid.warnings = _framing_warnings(vid)

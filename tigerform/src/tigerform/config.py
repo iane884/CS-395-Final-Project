@@ -134,8 +134,6 @@ PER_EVENT_FEATURES: List[FeatureSpec] = [
                 "Rotation of the hip line relative to address."),
     FeatureSpec("x_factor", "X-Factor (shoulder-hip separation)", "deg", ["top"],
                 "Shoulder turn minus hip turn at the top; a key power source."),
-    FeatureSpec("club_shaft_angle", "Club shaft angle", "deg", ["address", "top", "impact"],
-                "Approximate shaft angle from horizontal; swing-plane proxy."),
 ]
 
 GLOBAL_FEATURES: List[FeatureSpec] = [
@@ -182,3 +180,47 @@ def event_of(flat_key: str) -> Optional[str]:
 FEEDBACK_MODEL = os.environ.get("TIGERFORM_FEEDBACK_MODEL", "claude-opus-4-8")
 TOP_N_DEVIATIONS = 4          # how many deviations to surface in feedback
 ZSCORE_FLAG_THRESHOLD = 1.0   # |z| above this counts as a meaningful deviation
+
+# Plausible physiological ranges (keyed by base feature) used to winsorize
+# extracted values. Single-camera pose noise can produce impossible numbers
+# (e.g. a head "sway" of >1 torso length); clamping keeps one bad frame from
+# dominating the score/feedback.
+PLAUSIBLE_RANGES: Dict[str, tuple] = {
+    "lead_knee_flex": (0.0, 80.0), "trail_knee_flex": (0.0, 80.0),
+    "spine_tilt_forward": (0.0, 60.0), "spine_tilt_lateral": (0.0, 45.0),
+    "lead_elbow_angle": (90.0, 180.0),
+    "shoulder_turn": (0.0, 130.0), "hip_turn": (0.0, 90.0), "x_factor": (-15.0, 75.0),
+    "tempo_ratio": (0.5, 6.0), "total_swing_time": (0.3, 6.0),
+    "head_sway": (0.0, 0.4), "head_bob": (0.0, 0.4), "com_lateral_shift": (0.0, 0.5),
+}
+
+# How trustworthy each feature is from a single 2D camera (0-1). Lateral /
+# positional and depth-axis quantities are noisy, so they contribute less to the
+# score and rank lower in feedback. Anything not listed defaults to 1.0.
+# (Forward spine tilt lives in the camera depth axis, which a single phone camera
+# estimates poorly — hence it's down-weighted, not treated as a confident miss.)
+FEATURE_RELIABILITY: Dict[str, float] = {
+    "head_sway": 0.4, "head_bob": 0.4, "com_lateral_shift": 0.4,
+    "spine_tilt_forward": 0.5, "spine_tilt_lateral": 0.4,
+    "total_swing_time": 0.3,   # depends on how the clip is trimmed (setup/waggle)
+}
+DEFAULT_RELIABILITY = 1.0
+
+# Timing features form the "Tempo match" axis; everything else is "Position
+# match". Keeping them separate gives two orthogonal scores (positions vs rhythm).
+TEMPO_FEATURES = {"tempo_ratio", "total_swing_time"}
+
+# Cap on per-feature |z| when scoring similarity: beyond this many std a feature
+# is simply "very different" and shouldn't keep compounding (robust to the
+# synthetic-vs-real domain gap and to single bad features). Deviations still
+# report the true z for the breakdown.
+ZSCORE_SIM_CAP = 3.0
+
+
+def clamp_feature(base: str, value: float) -> float:
+    """Winsorize a feature value to its plausible range (NaN passes through)."""
+    import math
+    rng = PLAUSIBLE_RANGES.get(base)
+    if rng is None or value is None or (isinstance(value, float) and math.isnan(value)):
+        return value
+    return float(min(max(value, rng[0]), rng[1]))

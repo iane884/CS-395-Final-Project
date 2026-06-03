@@ -17,7 +17,8 @@ def test_run_on_sequence_report(reference, discriminator):
                              discriminator=discriminator)
     report = result.report()
 
-    assert 0 <= report["similarity_score"] <= 100
+    assert 0 <= report["position_match"] <= 100
+    assert 0 <= report["tempo_match"] <= 100
     assert set(report["events"]) >= {"address", "top", "impact", "finish"}
     assert "coaching_text" in report["feedback"]
     assert result.overlay_path and result.overlay_path.endswith(".mp4")
@@ -31,4 +32,4 @@ def test_compare_without_discriminator(reference, amateur_features):
     from tigerform.compare import compare_swing
     result = compare_swing(amateur_features, reference, discriminator=None)
     assert result.tiger_likeness is None
-    assert 0 <= result.similarity_score <= 100
+    assert 0 <= result.position_match <= 100

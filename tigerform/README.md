@@ -1,4 +1,4 @@
-# TigerForm ⛳
+# TigerForm
 
 **An AI golf-swing monitor that compares your mechanics to Tiger Woods' swing and gives corrective feedback.**
 
@@ -13,19 +13,19 @@ reference, and generates prioritized coaching feedback.
 
 ## What it does
 
-1. **Pose estimation** — MediaPipe BlazePose extracts 33 body landmarks per frame.
-2. **Swing segmentation** — locates the 8 standard swing events (address → top →
+1. **Pose estimation** - MediaPipe BlazePose extracts 33 body landmarks per frame.
+2. **Swing segmentation** - locates the 8 standard swing events (address → top →
    impact → finish) from the lead-hand height profile.
-3. **Club approximation** — estimates the shaft from the arms/hands (MediaPipe
+3. **Club approximation** - estimates the shaft from the arms/hands (MediaPipe
    doesn't see the club; ball tracking is intentionally out of scope).
-4. **Biomechanical features** — view-robust joint angles + tempo + X-factor +
+4. **Biomechanical features** - view-robust joint angles + tempo + X-factor +
    head stability, normalized so golfers of different size are comparable.
-5. **Comparison** — z-score deviations vs. a **Tiger reference template**, a
+5. **Comparison** - z-score deviations vs. a **Tiger reference template**, a
    0–100 **similarity score**, DTW sequence matching, and a **Tiger-vs-amateur
    discriminator** whose feature importances explain *which* mechanics differ.
-6. **Feedback** — a rule table maps deviations to drills; the Claude API phrases
+6. **Feedback** - a rule table maps deviations to drills; the Claude API phrases
    them into natural coaching (deterministic template fallback when offline).
-7. **App** — a Streamlit UI for uploading a swing and viewing the annotated
+7. **App** - a Streamlit UI for uploading a swing and viewing the annotated
    overlay, score, charts, and coaching.
 
 ### Design choices (vs. the original proposal)
@@ -83,7 +83,7 @@ Claude-phrased coaching (otherwise a deterministic template is used).
   swings) for the optional learned-segmentation upgrade and real negative-class
   swings.
 
-> Footage is never committed — only derived features. Use clips under
+> Footage is never committed - only derived features. Use clips under
 > educational fair use.
 
 ---
@@ -142,7 +142,7 @@ training data.
 - The club shaft is approximated from the hands, not detected; no ball tracking.
 - The bundled reference/discriminator are trained on a **synthetic** swing model
   for demonstration. Swap in real Tiger + amateur clips for meaningful real-world
-  scores — the code path is identical.
+  scores - the code path is identical.
 - "Tiger-likeness" reflects similarity to Tiger's signature mechanics, not an
   absolute measure of a "good" swing.
 
@@ -152,5 +152,5 @@ training data.
 pytest
 ```
 
-All tests run on synthetic swings — no video files, MediaPipe, or trained
+All tests run on synthetic swings - no video files, MediaPipe, or trained
 artifacts required.

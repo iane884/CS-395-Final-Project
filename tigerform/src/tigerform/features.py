@@ -18,7 +18,6 @@ from typing import Dict
 import numpy as np
 
 from . import config
-from .club import ClubTrack
 from .events import SwingEvents
 from .geometry import angle_between, midpoint
 from .normalize import normalized_positions
@@ -109,8 +108,7 @@ def _elbow_series(seq, lt, side: str) -> np.ndarray:
 # --------------------------------------------------------------------------- #
 # Public entry point
 # --------------------------------------------------------------------------- #
-def extract_features(seq: PoseSequence, events: SwingEvents,
-                     club: ClubTrack) -> SwingFeatures:
+def extract_features(seq: PoseSequence, events: SwingEvents) -> SwingFeatures:
     lt = config.lead_trail_indices(seq.handedness)
     n = seq.n_frames
     addr = events["address"]
@@ -135,7 +133,6 @@ def extract_features(seq: PoseSequence, events: SwingEvents,
             "lead_elbow_angle": lead_elbow[t],
             "shoulder_turn": shoulder_turn[t],
             "hip_turn": hip_turn[t],
-            "club_shaft_angle": club.shaft_angle[t],
         }
         fwd, lat = _spine_tilt(seq, t)
         per_ev["spine_tilt_forward"] = fwd
@@ -168,9 +165,12 @@ def extract_features(seq: PoseSequence, events: SwingEvents,
     sc["com_lateral_shift"] = float(np.nanmax(np.abs(hip_center[lo:hi, 0] - base_hip[0]))) \
         if hi > lo else float("nan")
 
-    # ---- time series for DTW (address..finish slice) ----
+    # Winsorize to plausible ranges so single-camera pose noise can't blow up
+    # a feature (e.g. an impossible head sway) and dominate scoring/feedback.
+    sc = {k: config.clamp_feature(config.base_of(k), v) for k, v in sc.items()}
+
+    # ---- time series for the comparison chart (address..finish slice) ----
     series = {
-        "shaft_angle": club.shaft_angle[lo:hi],
         "lead_elbow_angle": lead_elbow[lo:hi],
         "shoulder_turn": shoulder_turn[lo:hi],
     }

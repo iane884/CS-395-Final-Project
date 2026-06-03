@@ -42,7 +42,7 @@ def main():
         if amateur_dir.exists():
             labeled += _features_from_dir(amateur_dir, 0)
 
-    if sum(1 for _, y in labeled if y == 1) >= 5 and sum(1 for _, y in labeled if y == 0) >= 5:
+    if sum(1 for _, y in labeled if y == 1) >= 3 and sum(1 for _, y in labeled if y == 0) >= 3:
         print(f"Training on {len(labeled)} real clips.")
         feats = [f for f, _ in labeled]
         labels = [y for _, y in labeled]

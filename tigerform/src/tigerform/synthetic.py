@@ -214,6 +214,40 @@ def _project_front_on(world: np.ndarray) -> np.ndarray:
     return image
 
 
+def reference_params(n: int = 25, seed: int = 7):
+    """Tiger-like `SwingParams` with realistic swing-to-swing human variance.
+
+    The reference template's value comes from having *spread*: if every "Tiger"
+    swing were identical the per-feature std would be ~0 and any real swing would
+    saturate the score. We jitter the biomechanically meaningful params (and the
+    pose-noise level) to model how a pro's own swings vary clip to clip.
+    """
+    rng = np.random.default_rng(seed)
+    out = []
+    for _ in range(n):
+        out.append(replace(
+            TIGER,
+            shoulder_turn_top=TIGER.shoulder_turn_top + rng.normal(0, 7),
+            hip_turn_top=TIGER.hip_turn_top + rng.normal(0, 5),
+            lead_elbow_top=TIGER.lead_elbow_top + rng.normal(0, 6),
+            knee_flex=TIGER.knee_flex + rng.normal(0, 4),
+            spine_tilt=TIGER.spine_tilt + rng.normal(0, 4),
+            tempo_ratio=max(2.2, TIGER.tempo_ratio + rng.normal(0, 0.35)),
+            head_sway=max(0.0, TIGER.head_sway + rng.normal(0, 0.025)),
+            head_bob=max(0.0, TIGER.head_bob + rng.normal(0, 0.025)),
+            hip_slide=max(0.0, TIGER.hip_slide + rng.normal(0, 0.025)),
+            noise=float(np.clip(rng.normal(0.006, 0.002), 0.002, 0.012)),
+            n_frames=int(rng.integers(80, 115)),
+        ))
+    return out
+
+
+def reference_swings(n: int = 25, seed: int = 7):
+    """PoseSequences for building the Tiger reference template."""
+    return [synthetic_pose(p, seed=500 + i)
+            for i, p in enumerate(reference_params(n, seed))]
+
+
 def make_dataset(n_tiger: int = 25, n_amateur: int = 30, seed: int = 0):
     """Generate labeled (PoseSequence, label) pairs for the discriminator.
 

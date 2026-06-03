@@ -1,33 +1,26 @@
-"""Visualization: annotated overlay video + comparison charts.
+"""Visualization: annotated overlay video.
 
-* `render_overlay` draws the skeleton, approximate club shaft, and event labels
-  onto the source frames and writes an MP4.
-* The chart helpers return Matplotlib figures (Agg backend, headless-safe) that
-  the Streamlit app and CLI report embed.
+`render_overlay` draws the pose skeleton and event labels onto the source frames
+and writes a browser-playable (H.264) MP4. The user-facing comparison is a
+plain-language scorecard (see `scorecard.py`), rendered by the app.
 """
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
 
 import cv2
 import numpy as np
 
 from . import config
-from .club import ClubTrack
-from .compare import ComparisonResult
 from .events import SwingEvents
-from .features import SwingFeatures
 from .pose import PoseSequence
-from .reference import ReferenceTemplate
 
 _SKELETON_COLOR = (0, 220, 0)
-_CLUB_COLOR = (0, 165, 255)
 _JOINT_COLOR = (0, 0, 255)
 
 
 def draw_frame(frame: np.ndarray, seq: PoseSequence, t: int,
-               club: Optional[ClubTrack] = None, label: str = "") -> np.ndarray:
+               label: str = "") -> np.ndarray:
     out = frame.copy()
     h, w = out.shape[:2]
     px = seq.image_xy[t] * np.array([w, h], float)
@@ -40,21 +33,14 @@ def draw_frame(frame: np.ndarray, seq: PoseSequence, t: int,
         if np.all(np.isfinite(p)):
             cv2.circle(out, tuple(p.astype(int)), 3, _JOINT_COLOR, -1)
 
-    if club is not None:
-        g, hd = club.grip_xy[t], club.head_xy[t]
-        if np.all(np.isfinite(g)) and np.all(np.isfinite(hd)):
-            gp = (g * [w, h]).astype(int)
-            hp = (hd * [w, h]).astype(int)
-            cv2.line(out, tuple(gp), tuple(hp), _CLUB_COLOR, 3)
-
     if label:
         cv2.putText(out, label, (12, 32), cv2.FONT_HERSHEY_SIMPLEX, 0.9,
                     (255, 255, 255), 2, cv2.LINE_AA)
     return out
 
 
-def render_overlay(video, seq: PoseSequence, club: ClubTrack,
-                   events: SwingEvents, out_path: str | Path) -> Path:
+def render_overlay(video, seq: PoseSequence, events: SwingEvents,
+                   out_path: str | Path) -> Path:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -63,7 +49,7 @@ def render_overlay(video, seq: PoseSequence, club: ClubTrack,
     for t, frame in enumerate(video.frames):
         label = frame_to_event.get(t, "")
         label = label.replace("_", " ").title() if label else ""
-        bgr = draw_frame(frame, seq, t, club, label)
+        bgr = draw_frame(frame, seq, t, label)
         rgb_frames.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
 
     _write_video(out_path, rgb_frames, video.fps)
@@ -104,51 +90,47 @@ def _write_video(out_path: Path, rgb_frames, fps: float) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Charts (Matplotlib figures)
+# Deviation bar chart: biggest differences from Tiger
 # --------------------------------------------------------------------------- #
-def _mpl():
+def _dev_label(dev) -> str:
+    spec = config.SPEC_BY_BASE.get(dev.base)
+    name = spec.label if spec else dev.base.replace("_", " ")
+    return f"{name} ({dev.event})" if dev.event else name
+
+
+def deviation_chart(comparison, top_n: int = 6):
+    """Horizontal z-score bars of your biggest differences from Tiger. Bars to
+    the right = you do MORE than Tiger, left = LESS; longer = further off; red =
+    big difference, orange = moderate."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    return plt
 
-
-def deviation_chart(result: ComparisonResult, top_n: int = 6):
-    plt = _mpl()
-    devs = result.deviations[:top_n]
-    fig, ax = plt.subplots(figsize=(7, 0.6 * max(len(devs), 1) + 1))
+    devs = comparison.deviations[:top_n]
+    fig, ax = plt.subplots(figsize=(7.5, 0.62 * max(len(devs), 1) + 1.2))
     if not devs:
-        ax.text(0.5, 0.5, "No significant deviations", ha="center", va="center")
+        ax.text(0.5, 0.5, "No significant differences from Tiger — nice work!",
+                ha="center", va="center")
         ax.axis("off")
         return fig
-    labels = [d.base.replace("_", " ") + (f"@{d.event}" if d.event else "") for d in devs]
-    zs = [d.z for d in devs]
+
+    labels = [_dev_label(d) for d in devs]
+    zs = [float(np.clip(d.z, -3.5, 3.5)) for d in devs]
     colors = ["#d9534f" if abs(z) >= 2 else "#f0ad4e" for z in zs]
-    ax.barh(range(len(devs)), zs, color=colors)
-    ax.set_yticks(range(len(devs)))
-    ax.set_yticklabels(labels)
-    ax.axvline(0, color="k", lw=0.8)
-    ax.set_xlabel("Deviation from Tiger (z-score)   ← lower    higher →")
-    ax.set_title("Biggest mechanical differences")
+
+    y = list(range(len(devs)))
+    ax.barh(y, zs, color=colors, height=0.62, zorder=3)
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels, fontsize=9)
+    ax.axvline(0, color="#333333", lw=1)
+    ax.set_xlim(-3.6, 3.6)
+    ax.set_xticks([])
+    ax.set_xlabel("← you do LESS than Tiger          you do MORE than Tiger →",
+                  fontsize=9)
+    ax.set_title("Your biggest differences from Tiger", fontsize=12, fontweight="bold")
     ax.invert_yaxis()
-    fig.tight_layout()
-    return fig
-
-
-def series_chart(features: SwingFeatures, reference: ReferenceTemplate,
-                 name: str = "shaft_angle"):
-    plt = _mpl()
-    fig, ax = plt.subplots(figsize=(7, 3.5))
-    if name in features.series:
-        u = np.asarray(features.series[name], float)
-        ax.plot(np.linspace(0, 1, len(u)), u, label="You", color="#0275d8", lw=2)
-    if name in reference.series:
-        r = np.asarray(reference.series[name], float)
-        ax.plot(np.linspace(0, 1, len(r)), r, label="Tiger (avg)",
-                color="#5cb85c", lw=2, ls="--")
-    ax.set_xlabel("Swing progress (address → finish)")
-    ax.set_ylabel(name.replace("_", " "))
-    ax.set_title(f"Swing trace: {name.replace('_', ' ')}")
-    ax.legend()
+    for sp in ("top", "right", "bottom"):
+        ax.spines[sp].set_visible(False)
+    ax.tick_params(left=False)
     fig.tight_layout()
     return fig

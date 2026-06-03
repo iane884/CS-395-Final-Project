@@ -13,9 +13,7 @@ from pathlib import Path
 from tigerform import config
 from tigerform.analyze import analyze_sequence
 from tigerform.reference import build_reference
-from tigerform.synthetic import TIGER, synthetic_pose, make_dataset
-from dataclasses import replace
-import numpy as np
+from tigerform.synthetic import reference_swings
 
 
 def _features_from_clips(clip_dir: Path):
@@ -32,19 +30,7 @@ def _features_from_clips(clip_dir: Path):
 
 
 def _features_synthetic(n: int):
-    rng = np.random.default_rng(7)
-    feats = []
-    for i in range(n):
-        jittered = replace(
-            TIGER,
-            shoulder_turn_top=TIGER.shoulder_turn_top + rng.normal(0, 4),
-            hip_turn_top=TIGER.hip_turn_top + rng.normal(0, 3),
-            lead_elbow_top=TIGER.lead_elbow_top + rng.normal(0, 3),
-            tempo_ratio=max(2.4, TIGER.tempo_ratio + rng.normal(0, 0.2)),
-            n_frames=int(rng.integers(85, 105)),
-        )
-        feats.append(analyze_sequence(synthetic_pose(jittered, seed=500 + i)).features)
-    return feats
+    return [analyze_sequence(seq).features for seq in reference_swings(n)]
 
 
 def main():
