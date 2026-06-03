@@ -8,6 +8,7 @@ Run with:  streamlit run app/streamlit_app.py
 import pathlib
 import sys
 import tempfile
+import hashlib
 
 # Make the src/ package importable when run via `streamlit run`.
 _SRC = pathlib.Path(__file__).resolve().parents[1] / "src"
@@ -103,9 +104,11 @@ def show_result(result, features, reference, overlay_path=None):
                 if t.drill:
                     st.markdown(f"**Drill:** {t.drill}")
 
+    report_json = _report_json(result)
+    report_key = hashlib.sha256(report_json.encode("utf-8")).hexdigest()[:12]
     st.download_button("Download JSON report",
-                       data=_report_json(result), file_name="tigerform_report.json",
-                       mime="application/json")
+                       data=report_json, file_name="tigerform_report.json",
+                       mime="application/json", key=f"download-report-{report_key}")
 
 
 def _report_json(result) -> str:
